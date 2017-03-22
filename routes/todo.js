@@ -3,7 +3,7 @@ var express    = require('express');
 var Mongo      = require('mongodb').MongoClient;
 var ObjectId   = require('mongodb').ObjectID;
 var router     = express.Router();
-var url        = 'mongodb://todopwa:todopwa@ds137730.mlab.com:37730/heroku_d84zbs2h';
+var url        = process.env.MONGODB_URI;
 
 /**
  * Get the list of "to do" items.
