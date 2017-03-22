@@ -33,7 +33,7 @@ a {
     background-color: red;
 }
 
-@media only screen and (min-width : 321px) {
+@media only screen and (min-width : 321px) and (max-device-width : 480px) {
     body {
         font-size : 3.5rem;
         padding : 2rem;
