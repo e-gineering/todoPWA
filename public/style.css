@@ -32,3 +32,15 @@ a {
 .offline {
     background-color: red;
 }
+
+@media only screen and (min-width : 321px) {
+    body {
+        font-size : 3.5rem;
+        padding : 2rem;
+    }
+
+    button {
+        font-size : 3.5rem;
+        min-width : 5rem;
+    }
+}
