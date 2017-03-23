@@ -35,6 +35,80 @@ var cacheAllItems = function cacheAllItems(url) {
 };
 
 /**
+ * Post a message to all clients for this service worker.
+ * In the future, events to the service worker will include a clientId, so we will be
+ * able to target only the initiating client. For now, this sends to all (which means
+ * if the user has multiple tabs of the site open, the message will go to all of them).
+ *
+ * @param message The message
+ */
+var postMessageToClients = function postMessageToClients(message) {
+    self.clients.matchAll().then(function(clients) {
+        var i;
+        if (clients && clients.length) {
+            for (i = 0; i < clients.length; i++) {
+                clients[i].postMessage(message);
+            }
+        }
+    });
+};
+
+
+var processOutbox = function clearOutbox(event) {
+    console.log('[Service Worker] - sync event');
+    event.waitUntil(
+        store.outbox('readonly').then(function (outbox) {
+            return outbox.getAll();
+        }).then(function (messages) {
+            return Promise.all(messages.map(function (message) {
+                return fetch(message.url, {
+                    credential : 'include',
+                    method     : message.method,
+                    body       : JSON.stringify(message.item),
+                    headers    : {
+                        'Accept'           : 'application/json',
+                        'X-Requested-With' : 'XMLHttpRequest',
+                        'Content-Type'     : 'application/json'
+                    }
+                }).then(function (response) {
+                    console.log('[Service Worker] - returning response');
+                    return response.json();
+                }).then(function (data) {
+
+                    console.log('[Service Worker] - background sync complete');
+
+                    // show a notification, if the user has granted permission
+                    if (Notification.permission === 'granted') {
+                        self.registration.showNotification('Todo PWA', {
+                            icon : '/images/TodoPWA.png',
+                            body : 'Saved ' + message.item.name + '!'
+                        });
+                    }
+
+                    // Post a message to the client(s) to update
+                    postMessageToClients({
+                        name : 'syncComplete',
+                        item : message.item
+                    });
+
+                    // Clear the message from the outbox so it doesn't get processed again.
+                    return store.outbox('readwrite').then(function (outbox) {
+                        return outbox.delete(message.id);
+                    });
+                }).catch(function (error) {
+                    console.log('[Service Worker] - sync failed', message.item);
+                    postMessageToClients({
+                        name : 'syncFailed',
+                        item : message.item
+                    });
+                });
+            }));
+        })
+    );
+};
+
+
+/**
  * Cache all the essential files.
  */
 self.addEventListener('install', function(e) {
@@ -77,42 +151,37 @@ self.addEventListener('fetch', function(e) {
 
     // if list/item, check cache
     var isList = url.match(/\/todos\//);
-    var isItem = url.match(/\/todo\/\w*$/);
 
     // I noticed this was executing on a 'PUT', which caused some issues.
     // Limit to only 'GET' requests.
     if (e.request.method === 'GET') {
 
-        if (isList || isItem) {
+        if (isList) {
 
-            // Getting the list of "to do" items, or a single item...
-            e.respondWith(
-                // open our data cache
-                caches.open(dataCacheName).then(function (cache) {
-
-                    // Attempt a network call. If it succeeds, cache the response
-                    // and return. Otherwise, attempt a cache lookup.
-                    return fetch(e.request).then(function (response) {
-                        console.log('[Service Worker] retrieved ' + url + ' from server. Caching.');
-                        cache.put(url, response.clone()).then(function () {
-                            if (isList) {
-                                cacheAllItems(url);
-                            }
-                        });
-                        return response;
-
-                    }).catch(function () {
-                        console.log('[Service Worker] returning ' + url + ' from cache');
-
-                        // What happens when there's a cache miss, too?
-                        return cache.match(url);
+            // For the list request, let's go to the network first, and fall back to cache.
+            // When the network request is complete, request and cache all of the individual
+            // items.
+            caches.open(dataCacheName).then(function (cache) {
+                return fetch(e.request).then(function (response) {
+                    console.log('[Service Worker] retrieved ' + url + ' from server. Caching.');
+                    cache.put(url, response.clone()).then(function () {
+                        cacheAllItems(url);
                     });
-                })
-            );
+                    return response;
+
+                }).catch(function () {
+                    console.log('[Service Worker] returning ' + url + ' from cache');
+
+                    // What happens when there's a cache miss, too?
+                    return cache.match(url);
+                });
+            });
 
         } else {
 
-            // check cache for static resources
+            // For everything else, let's look in the cache first and then fall back to
+            // the network. The static files and individual "to do" items should already
+            // be in cache.
             e.respondWith(
                 caches.match(e.request).then(function (response) {
                     return response || fetch(e.request);
@@ -130,50 +199,14 @@ self.addEventListener('fetch', function(e) {
  */
 self.addEventListener('sync', function(event) {
     if (event.tag === 'outbox') {
-        console.log('[Service Worker] - sync event');
-        event.waitUntil(
-            store.outbox('readonly').then(function (outbox) {
-                return outbox.getAll();
-            }).then(function (messages) {
-                return Promise.all(messages.map(function (message) {
-                    return fetch(message.url, {
-                        credential : 'include',
-                        method     : message.method,
-                        body       : JSON.stringify(message.item),
-                        headers    : {
-                            'Accept'           : 'application/json',
-                            'X-Requested-With' : 'XMLHttpRequest',
-                            'Content-Type'     : 'application/json'
-                        }
-                    }).then(function (response) {
-                        console.log('[Service Worker] - returning response');
-                        return response.json();
-                    }).then(function (data) {
+        console.log('[Service Worker] - syn initiated, processing outbox.')
+        processOutbox(event);
+    }
+});
 
-                        console.log('[Service Worker] - background sync complete');
-
-                        if (Notification.permission === 'granted') {
-                            self.registration.showNotification('Todo PWA', {
-                                icon : '/images/TodoPWA.png',
-                                body : 'Saved ' + message.item.name + '!'
-                            });
-                        }
-
-                        self.clients.matchAll().then(function(clients) {
-                            var i;
-                            if (clients && clients.length) {
-                                for (i = 0; i < clients.length; i++) {
-                                    console.log('[Service Worker] - Client : ' + JSON.stringify(clients[i]));
-                                    clients[i].postMessage('complete');
-                                }
-                            }
-                        });
-                        return store.outbox('readwrite').then(function (outbox) {
-                            return outbox.delete(message.id);
-                        });
-                    });
-                }));
-            })
-        );
+self.addEventListener('message', function(event) {
+    if (event.data && event.data.name === 'clearOutbox') {
+        console.log('[Service Worker] - message received, processing outbox.')
+        processOutbox(event);
     }
 });

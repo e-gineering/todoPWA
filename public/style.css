@@ -43,4 +43,8 @@ a {
         font-size : 3.5rem;
         min-width : 5rem;
     }
+
+    input[type=checkbox] {
+        transform : scale(4);
+    }
 }

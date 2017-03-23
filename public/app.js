@@ -36,6 +36,19 @@
         app.saveItem(item);
     };
 
+    /**
+     * Clear out any values in the "to do" form and show the list/controls
+     */
+    app.showTodoList = function showTodoList() {
+        app.todoId.value = '';
+        app.todoName.value = '';
+        app.todoCheckbox.checked = false;
+        app.todoLegend.innerHTML = '';
+        app.todoListContainer.setAttribute('class', '');
+        app.todoFormContainer.setAttribute('class', 'hidden');
+        app.loginFormContainer.setAttribute('class', 'hidden');
+        app.controlsContainer.setAttribute('class', '');
+    };
 
     /**
      * Handle the click event for the 'add to do' button
@@ -49,6 +62,9 @@
         });
     });
 
+    /**
+     * Handler for the refresh button
+     */
     app.refreshButton.addEventListener('click', function(event) {
         event.preventDefault();
         app.getList();
@@ -58,21 +74,14 @@
     /**
      * Handle the click event for the cancel link on the add/edit form
      */
-    app.cancelTodo.addEventListener('click', function(event) {
-        app.todoId.value = '';
-        app.todoName.value = '';
-        app.todoCheckbox.checked = false;
-        app.todoLegend.innerHTML = '';
-        app.todoListContainer.setAttribute('class', '');
-        app.todoFormContainer.setAttribute('class', 'hidden');
-        app.loginFormContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', '');
-    });
+    app.cancelTodo.addEventListener('click', app.showTodoList);
 
 
-    // online event handling.
-    // TODO - Maybe post a message to the service worker?
-    app.isOnline = function isOnline() {
+    /**
+     * online event handling.
+     * TODO - Maybe post a message to the service worker?
+     */
+    app.setOnline = function isOnline() {
         if (navigator.onLine) {
             app.connectionStatus.setAttribute('class', 'online');
         } else {
@@ -80,9 +89,11 @@
         }
     };
 
-    window.addEventListener('online', app.isOnline);
-    window.addEventListener('offline', app.isOnline);
 
+
+    /**
+     * Show the login form
+     */
     app.showLogin = function showLogin() {
         app.loginFormContainer.setAttribute('class', '');
         app.todoListContainer.setAttribute('class', 'hidden');
@@ -90,11 +101,16 @@
         app.todoFormContainer.setAttribute('class', 'hidden');
     };
 
+    /**
+     * Event handler for submitting the login form
+     */
     app.loginForm.addEventListener('submit', function(event) {
         event.preventDefault();
         var user = app.userName.value;
         if (user) {
-            localStorage.setItem('todoPWAid', user);
+            if (window.localStorage) {
+                localStorage.setItem('todoPWAid', user);
+            }
             app.user = user;
             app.getList();
         }
@@ -128,7 +144,7 @@
                         app.todoListContainer.innerHTML = '';
 
                         for (i = 0; i < response.length; i++) {
-                            var className = response[i].isDone ? 'complete' : 'not-done';
+                            className = response[i].isDone ? 'complete' : 'not-done';
                             div = document.createElement('div');
                             text = document.createTextNode(response[i].name);
                             a = document.createElement('a');
@@ -247,8 +263,12 @@
 
 
     app.start = function start() {
-        var user = localStorage.getItem('todoPWAid');
-        app.isOnline();
+        var user;
+
+        if (window.localStorage) {
+            user = localStorage.getItem('todoPWAid');
+        }
+        app.setOnline();
         if (user) {
             app.user = user;
             app.getList();
@@ -303,7 +323,14 @@
                     // Listen for messages from the service worker.
                     navigator.serviceWorker.addEventListener('message', function(event) {
                         console.log('[app] received message from service worker');
-                        app.getList();
+
+                        if (event.data && event.data.name) {
+                            if (event.data.name === 'syncComplete') {
+                                app.getList();
+                            } else if (event.data.name === 'syncFailed') {
+                                alert('Network problem. Do not worry, though! The app will retry in the background when you close the page!');
+                            }
+                        }
                     });
 
                     // Add a 'submit' listener. This will place a message in IndexedDB for the
@@ -341,7 +368,8 @@
                                     return registration.sync.register('outbox');
 
                                 }).then(function() {
-                                    app.getList();
+                                    //app.getList();
+                                    app.showTodoList();
 
                                 }).catch(function(err) {
                                     console.error('[app] Error with "sync"', err);
@@ -350,11 +378,26 @@
                         });
                     });
 
+                    window.addEventListener('online', function(event) {
+                        app.connectionStatus.setAttribute('class', 'online');
+                        return new Promise(function(resolve, reject) {
+                            var messageChannel = new MessageChannel();
+                            navigator.serviceWorker.controller.postMessage({
+                                name: 'clearOutbox'
+                            }, [messageChannel.port2]);
+                        });
+                    });
+                    window.addEventListener('offline', app.setOnline);
+
                 } else {
                     console.log('[app] Browser supports service worker, but not sync');
 
                     // attach the plain old submit handler to the event
                     app.todoForm.addEventListener('submit', app.todoSubmitHandler);
+
+                    // Add event listeners for connection status change
+                    window.addEventListener('online', app.setOnline);
+                    window.addEventListener('offline', app.setOnline);
                 }
             })
             .catch(function(error) {
@@ -366,6 +409,11 @@
 
         // add plain ol' submit event listener here
         app.todoForm.addEventListener('submit', app.todoSubmitHandler);
+
+        // Add event listeners for connection status change
+        window.addEventListener('online', app.setOnline);
+        window.addEventListener('offline', app.setOnline);
+
         app.start();
     }
 }());
