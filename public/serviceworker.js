@@ -136,23 +136,10 @@ self.addEventListener('sync', function(event) {
                 return outbox.getAll();
             }).then(function (messages) {
                 return Promise.all(messages.map(function (message) {
-                    var method    = 'POST';
-                    var url       = '/todo';
-                    var messageId = message.id;
-
-                    // remove the IndexedDB id
-                    delete message.id;
-
-                    // if it has an _id prop, change to 'PUT'
-                    if (message._id) {
-                        method = 'PUT';
-                        url = '/todo/' + message._id;
-                    }
-
-                    return fetch(url, {
+                    return fetch(message.url, {
                         credential : 'include',
-                        method     : method,
-                        body       : JSON.stringify(message),
+                        method     : message.method,
+                        body       : JSON.stringify(message.item),
                         headers    : {
                             'Accept'           : 'application/json',
                             'X-Requested-With' : 'XMLHttpRequest',
@@ -162,15 +149,27 @@ self.addEventListener('sync', function(event) {
                         console.log('[Service Worker] - returning response');
                         return response.json();
                     }).then(function (data) {
+
                         console.log('[Service Worker] - background sync complete');
+
                         if (Notification.permission === 'granted') {
                             self.registration.showNotification('Todo PWA', {
                                 icon : '/images/TodoPWA.png',
-                                body : 'Saved ' + message.name + '!'
+                                body : 'Saved ' + message.item.name + '!'
                             });
                         }
+
+                        self.clients.matchAll().then(function(clients) {
+                            var i;
+                            if (clients && clients.length) {
+                                for (i = 0; i < clients.length; i++) {
+                                    console.log('[Service Worker] - Client : ' + JSON.stringify(clients[i]));
+                                    clients[i].postMessage('complete');
+                                }
+                            }
+                        });
                         return store.outbox('readwrite').then(function (outbox) {
-                            return outbox.delete(messageId);
+                            return outbox.delete(message.id);
                         });
                     });
                 }));

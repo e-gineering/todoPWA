@@ -61,7 +61,7 @@
     app.cancelTodo.addEventListener('click', function(event) {
         app.todoId.value = '';
         app.todoName.value = '';
-        app.todoCheckbox.checked = false
+        app.todoCheckbox.checked = false;
         app.todoLegend.innerHTML = '';
         app.todoListContainer.setAttribute('class', '');
         app.todoFormContainer.setAttribute('class', 'hidden');
@@ -299,23 +299,39 @@
                 // Check if the browser supports background sync
                 if ('sync' in registration) {
                     console.log('[app] Browser supports sync, registering event');
+
+                    // Listen for messages from the service worker.
+                    navigator.serviceWorker.addEventListener('message', function(event) {
+                        console.log('[app] received message from service worker');
+                        app.getList();
+                    });
+
+                    // Add a 'submit' listener. This will place a message in IndexedDB for the
+                    // service worker to process in the background.
                     app.todoForm.addEventListener('submit', function(event) {
                         event.preventDefault();
                         new Promise(function(resolve, reject) {
                             Notification.requestPermission(function (result) {
                                 if (result === 'granted') {
                                     resolve();
-                                /*
-                                } else {
-                                    return reject(Error('User decline notifications'));
-                                */
                                 }
                             }).then(function() {
+                                var method = 'POST';
+                                var url    = '/todo';
+                                // if it has an _id prop, change to 'PUT'
+                                if (app.todoId.value) {
+                                    method = 'PUT';
+                                    url    = '/todo/' + app.todoId.value;
+                                }
                                 var message = {
-                                    _id    : app.todoId.value,
-                                    name   : app.todoName.value,
-                                    isDone : app.todoCheckbox.checked,
-                                    user   : app.user
+                                    method : method,
+                                    url    : url,
+                                    item   : {
+                                        _id    : app.todoId.value,
+                                        name   : app.todoName.value,
+                                        isDone : app.todoCheckbox.checked,
+                                        user   : app.user
+                                    }
                                 };
 
                                 store.outbox('readwrite').then(function(outbox) {
@@ -324,10 +340,8 @@
                                     console.log('[app] registering sync');
                                     return registration.sync.register('outbox');
 
-
                                 }).then(function() {
                                     app.getList();
-
 
                                 }).catch(function(err) {
                                     console.error('[app] Error with "sync"', err);
@@ -338,10 +352,9 @@
 
                 } else {
                     console.log('[app] Browser supports service worker, but not sync');
-                    app.todoForm.addEventListener('submit', app.todoSubmitHandler);
 
-                    // not sure we need this...
-                    //app.start();
+                    // attach the plain old submit handler to the event
+                    app.todoForm.addEventListener('submit', app.todoSubmitHandler);
                 }
             })
             .catch(function(error) {
@@ -350,6 +363,7 @@
 
     } else {
         console.log('[app] browser does not support service workers');
+
         // add plain ol' submit event listener here
         app.todoForm.addEventListener('submit', app.todoSubmitHandler);
         app.start();

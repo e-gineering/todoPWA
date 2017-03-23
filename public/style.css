@@ -39,7 +39,7 @@ a {
         padding : 2rem;
     }
 
-    button {
+    input, button {
         font-size : 3.5rem;
         min-width : 5rem;
     }
