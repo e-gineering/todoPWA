@@ -31,7 +31,16 @@
         </div>
 
         <div id="todoListContainer" class="hidden">
-            <p>You have nothing to do :-(</p>
+            <div id="todoList">
+               <p>You have nothing to do :-(</p>
+            </div>
+            <div id="pendingList"></div>
+            <div>
+                <p>
+                    <button id="addTodo">Add</button>
+                    <button id="refreshButton">Refresh</button>
+                </p>
+            </div>
         </div>
 
         <div id="todoFormContainer" class="hidden">
@@ -53,13 +62,6 @@
                     </p>
                 </fieldset>
             </form>
-        </div>
-
-        <div id="controlsContainer" class="hidden">
-            <p>
-                <button id="addTodo">Add</button>
-                <button id="refreshButton">Refresh</button>
-            </p>
         </div>
 
         <script src="/js/idb.js"></script>

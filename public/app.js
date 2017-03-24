@@ -7,15 +7,16 @@
         addTodo            : document.querySelector('#addTodo'),
         cancelTodo         : document.querySelector('#cancelTodo'),
         connectionStatus   : document.querySelector('#connectionStatus'),
-        controlsContainer  : document.querySelector('#controlsContainer'),
         loginForm          : document.querySelector('#loginForm'),
         loginFormContainer : document.querySelector('#loginFormContainer'),
+        pendingList        : document.querySelector('#pendingList'),
         refreshButton      : document.querySelector('#refreshButton'),
         todoCheckbox       : document.querySelector('#todoItemDone'),
         todoForm           : document.querySelector('#todoFormContainer form'),
         todoFormContainer  : document.querySelector('#todoFormContainer'),
         todoId             : document.querySelector('#todoId'),
         todoLegend         : document.querySelector('#todoFormContainer legend'),
+        todoList           : document.querySelector('#todoList'),
         todoName           : document.querySelector('#todoItemName'),
         todoListContainer  : document.querySelector('#todoListContainer'),
         userName           : document.querySelector('#userName')
@@ -23,6 +24,41 @@
 
 
     /* Add some functions to the app */
+
+    /**
+     * Get the pending items from IndexedDB to show...
+     */
+    app.loadPending = function loadPending() {
+        app.pendingList.innerHTML = '';
+        store.outbox('readonly').then(function (outbox) {
+            return outbox.getAll();
+        }).then(function (messages) {
+            var action;
+            var div;
+            var fragment;
+            var h3;
+            var i;
+            var text;
+
+            if (messages && messages.length) {
+                fragment = document.createDocumentFragment();
+                h3 = document.createElement('h3');
+                text = document.createTextNode('Pending changes...');
+                h3.appendChild(text);
+                fragment.appendChild(h3);
+
+                for (i = 0; i < messages.length; i++) {
+                    action = (messages[i].item._id) ? 'Updating "' : 'Adding "';
+                    div    = document.createElement('div');
+                    text   = document.createTextNode(action + messages[i].item.name + '"');
+
+                    div.appendChild(text);
+                    fragment.appendChild(div);
+                }
+                app.pendingList.appendChild(fragment);
+            }
+        });
+    };
 
     /**
      * Handle the submission of the Add/Edit "to do" form
@@ -49,7 +85,6 @@
         app.todoCheckbox.checked = item.isDone;
         app.todoLegend.innerHTML = item._id ? 'Edit' : 'Add';
         app.todoListContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', 'hidden');
         app.todoFormContainer.setAttribute('class', '');
     };
 
@@ -70,7 +105,6 @@
     app.showLogin = function showLogin() {
         app.loginFormContainer.setAttribute('class', '');
         app.todoListContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', 'hidden');
         app.todoFormContainer.setAttribute('class', 'hidden');
     };
 
@@ -81,6 +115,7 @@
         if (event) {
             event.preventDefault();
         }
+        app.loadPending();
         app.todoId.value = '';
         app.todoName.value = '';
         app.todoCheckbox.checked = false;
@@ -88,7 +123,6 @@
         app.todoListContainer.setAttribute('class', '');
         app.todoFormContainer.setAttribute('class', 'hidden');
         app.loginFormContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', '');
     };
 
     /**
@@ -133,13 +167,8 @@
                     var items;
                     var text;
 
-                    app.todoListContainer.setAttribute('class', '');
-                    app.loginFormContainer.setAttribute('class', 'hidden');
-                    app.todoFormContainer.setAttribute('class', 'hidden');
-                    app.controlsContainer.setAttribute('class', '');
-
                     if (response.length) {
-                        app.todoListContainer.innerHTML = '';
+                        app.todoList.innerHTML = '';
 
                         for (i = 0; i < response.length; i++) {
                             className = response[i].isDone ? 'complete' : 'not-done';
@@ -158,7 +187,7 @@
 
                             fragment.appendChild(div);
                         }
-                        app.todoListContainer.appendChild(fragment);
+                        app.todoList.appendChild(fragment);
 
                         items = document.querySelectorAll('.editItem');
                         for (i = 0; i < items.length; i++) {
@@ -168,6 +197,8 @@
                             });
                         }
                     }
+                    app.showTodoList();
+
                 } else {
                     // error
                 }
@@ -380,7 +411,6 @@
                                     return registration.sync.register('outbox');
 
                                 }).then(function() {
-                                    //app.getList();
                                     app.showTodoList();
 
                                 }).catch(function(err) {
