@@ -29,35 +29,37 @@
      * Get the pending items from IndexedDB to show...
      */
     app.loadPending = function loadPending() {
-        app.pendingList.innerHTML = '';
-        store.outbox('readonly').then(function (outbox) {
-            return outbox.getAll();
-        }).then(function (messages) {
-            var action;
-            var div;
-            var fragment;
-            var h3;
-            var i;
-            var text;
+        if ('serviceWorker' in navigator) {
+            app.pendingList.innerHTML = '';
+            store.outbox('readonly').then(function (outbox) {
+                return outbox.getAll();
+            }).then(function (messages) {
+                var action;
+                var div;
+                var fragment;
+                var h3;
+                var i;
+                var text;
 
-            if (messages && messages.length) {
-                fragment = document.createDocumentFragment();
-                h3 = document.createElement('h3');
-                text = document.createTextNode('Pending changes...');
-                h3.appendChild(text);
-                fragment.appendChild(h3);
+                if (messages && messages.length) {
+                    fragment = document.createDocumentFragment();
+                    h3 = document.createElement('h3');
+                    text = document.createTextNode('Pending changes...');
+                    h3.appendChild(text);
+                    fragment.appendChild(h3);
 
-                for (i = 0; i < messages.length; i++) {
-                    action = (messages[i].item._id) ? 'Updating "' : 'Adding "';
-                    div    = document.createElement('div');
-                    text   = document.createTextNode(action + messages[i].item.name + '"');
+                    for (i = 0; i < messages.length; i++) {
+                        action = (messages[i].item._id) ? 'Updating "' : 'Adding "';
+                        div = document.createElement('div');
+                        text = document.createTextNode(action + messages[i].item.name + '"');
 
-                    div.appendChild(text);
-                    fragment.appendChild(div);
+                        div.appendChild(text);
+                        fragment.appendChild(div);
+                    }
+                    app.pendingList.appendChild(fragment);
                 }
-                app.pendingList.appendChild(fragment);
-            }
-        });
+            });
+        }
     };
 
     /**
