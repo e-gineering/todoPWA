@@ -22,6 +22,8 @@
     };
 
 
+    /* Add some functions to the app */
+
     /**
      * Handle the submission of the Add/Edit "to do" form
      */
@@ -37,49 +39,22 @@
     };
 
     /**
-     * Clear out any values in the "to do" form and show the list/controls
+     * Render the add/edit form
+     *
+     * @param item the "to do" item to render
      */
-    app.showTodoList = function showTodoList() {
-        app.todoId.value = '';
-        app.todoName.value = '';
-        app.todoCheckbox.checked = false;
-        app.todoLegend.innerHTML = '';
-        app.todoListContainer.setAttribute('class', '');
-        app.todoFormContainer.setAttribute('class', 'hidden');
-        app.loginFormContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', '');
+    app.renderForm = function renderForm(item) {
+        app.todoId.value = item._id;
+        app.todoName.value = item.name;
+        app.todoCheckbox.checked = item.isDone;
+        app.todoLegend.innerHTML = item._id ? 'Edit' : 'Add';
+        app.todoListContainer.setAttribute('class', 'hidden');
+        app.controlsContainer.setAttribute('class', 'hidden');
+        app.todoFormContainer.setAttribute('class', '');
     };
 
     /**
-     * Handle the click event for the 'add to do' button
-     */
-    app.addTodo.addEventListener('click', function(event) {
-        event.preventDefault();
-        app.renderForm({
-            _id    : '',
-            name   : '',
-            isDone : false
-        });
-    });
-
-    /**
-     * Handler for the refresh button
-     */
-    app.refreshButton.addEventListener('click', function(event) {
-        event.preventDefault();
-        app.getList();
-    });
-
-
-    /**
-     * Handle the click event for the cancel link on the add/edit form
-     */
-    app.cancelTodo.addEventListener('click', app.showTodoList);
-
-
-    /**
      * online event handling.
-     * TODO - Maybe post a message to the service worker?
      */
     app.setOnline = function isOnline() {
         if (navigator.onLine) {
@@ -88,8 +63,6 @@
             app.connectionStatus.setAttribute('class', 'offline');
         }
     };
-
-
 
     /**
      * Show the login form
@@ -102,19 +75,44 @@
     };
 
     /**
-     * Event handler for submitting the login form
+     * Clear out any values in the "to do" form and show the list/controls
      */
-    app.loginForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        var user = app.userName.value;
+    app.showTodoList = function showTodoList(event) {
+        if (event) {
+            event.preventDefault();
+        }
+        app.todoId.value = '';
+        app.todoName.value = '';
+        app.todoCheckbox.checked = false;
+        app.todoLegend.innerHTML = '';
+        app.todoListContainer.setAttribute('class', '');
+        app.todoFormContainer.setAttribute('class', 'hidden');
+        app.loginFormContainer.setAttribute('class', 'hidden');
+        app.controlsContainer.setAttribute('class', '');
+    };
+
+    /**
+     * Start the application.
+     */
+    app.start = function start() {
+        var user;
+
+        if (window.localStorage) {
+            user = localStorage.getItem('todoPWAid');
+        }
+        app.setOnline();
         if (user) {
-            if (window.localStorage) {
-                localStorage.setItem('todoPWAid', user);
-            }
             app.user = user;
             app.getList();
+        } else {
+            app.showLogin();
         }
-    });
+    };
+
+    /* End Functions */
+
+
+    /* Add some more functions to interface with the service */
 
     /**
      * Get the list of todos and render them
@@ -181,7 +179,6 @@
         request.send();
     };
 
-
     /**
      * Edit the specified item. Retrieve it from the service and
      * then render the form.
@@ -207,23 +204,6 @@
         request.open('GET', url);
         request.send();
     };
-
-
-    /**
-     * Render the add/edit form
-     *
-     * @param item the "to do" item to render
-     */
-    app.renderForm = function renderForm(item) {
-        app.todoId.value = item._id;
-        app.todoName.value = item.name;
-        app.todoCheckbox.checked = item.isDone;
-        app.todoLegend.innerHTML = item._id ? 'Edit' : 'Add';
-        app.todoListContainer.setAttribute('class', 'hidden');
-        app.controlsContainer.setAttribute('class', 'hidden');
-        app.todoFormContainer.setAttribute('class', '');
-    };
-
 
     /**
      * Save the specified item. Depending on whether or not it has
@@ -261,21 +241,52 @@
         request.send(JSON.stringify(item));
     };
 
+    /* End service interface functions */
 
-    app.start = function start() {
-        var user;
 
-        if (window.localStorage) {
-            user = localStorage.getItem('todoPWAid');
-        }
-        app.setOnline();
+    /* Add some event handlers to the app. Some will use the functions above */
+
+    /**
+     * Handle the click event for the 'add to do' button
+     */
+    app.addTodo.addEventListener('click', function(event) {
+        event.preventDefault();
+        app.renderForm({
+            _id    : '',
+            name   : '',
+            isDone : false
+        });
+    });
+
+    /**
+     * Handler for the refresh button
+     */
+    app.refreshButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        app.getList();
+    });
+
+    /**
+     * Handle the click event for the cancel link on the add/edit form
+     */
+    app.cancelTodo.addEventListener('click', app.showTodoList);
+
+    /**
+     * Event handler for submitting the login form
+     */
+    app.loginForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var user = app.userName.value;
         if (user) {
+            if (window.localStorage) {
+                localStorage.setItem('todoPWAid', user);
+            }
             app.user = user;
             app.getList();
-        } else {
-            app.showLogin();
         }
-    };
+    });
+
+    /* End event handlers */
 
 
 
@@ -285,8 +296,7 @@
         // If the app is loaded while offline (or unable to connect to the server)
         // this will result in a very nebulous error that simply says:
         // "An unknown error occurred when fetching the script."
-        navigator.serviceWorker
-            .register('./serviceworker.js')
+        navigator.serviceWorker.register('./serviceworker.js')
             .then(function(registration) {
                 var sw;
                 if (registration.installing) {
@@ -378,12 +388,17 @@
                         });
                     });
 
+                    /*
+                     * Listen for the 'online' event. When it happens, call the setOnline() function
+                     * to toggle the class on the indicator, AND post a message to the service worker
+                     * to process the outbox.
+                     */
                     window.addEventListener('online', function(event) {
-                        app.connectionStatus.setAttribute('class', 'online');
+                        app.setOnline();
                         return new Promise(function(resolve, reject) {
                             var messageChannel = new MessageChannel();
                             navigator.serviceWorker.controller.postMessage({
-                                name: 'clearOutbox'
+                                name: 'processOutbox'
                             }, [messageChannel.port2]);
                         });
                     });
@@ -394,26 +409,23 @@
 
                     // attach the plain old submit handler to the event
                     app.todoForm.addEventListener('submit', app.todoSubmitHandler);
-
-                    // Add event listeners for connection status change
                     window.addEventListener('online', app.setOnline);
                     window.addEventListener('offline', app.setOnline);
                 }
-            })
-            .catch(function(error) {
+
+            }).catch(function(error) {
                 console.log('[app] Error registering service worker: ', error);
             });
 
     } else {
         console.log('[app] browser does not support service workers');
 
-        // add plain ol' submit event listener here
+        // Add some event listeners for browsers that do not support serviceWorker
         app.todoForm.addEventListener('submit', app.todoSubmitHandler);
-
-        // Add event listeners for connection status change
         window.addEventListener('online', app.setOnline);
         window.addEventListener('offline', app.setOnline);
 
+        // Start the app!
         app.start();
     }
 }());

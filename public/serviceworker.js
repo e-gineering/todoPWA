@@ -54,6 +54,10 @@ var postMessageToClients = function postMessageToClients(message) {
 };
 
 
+/**
+ * Process the outbox in IndexedDB.
+ * @param event
+ */
 var processOutbox = function clearOutbox(event) {
     console.log('[Service Worker] - sync event');
     event.waitUntil(
@@ -95,12 +99,16 @@ var processOutbox = function clearOutbox(event) {
                     return store.outbox('readwrite').then(function (outbox) {
                         return outbox.delete(message.id);
                     });
+
+                /* Note - this MIGHT be causing issues with retrying after closing the app
                 }).catch(function (error) {
                     console.log('[Service Worker] - sync failed', message.item);
                     postMessageToClients({
                         name : 'syncFailed',
                         item : message.item
                     });
+                    Promise.reject(new Error('sync failed'));
+                 */
                 });
             }));
         })
@@ -161,21 +169,23 @@ self.addEventListener('fetch', function(e) {
             // For the list request, let's go to the network first, and fall back to cache.
             // When the network request is complete, request and cache all of the individual
             // items.
-            caches.open(dataCacheName).then(function (cache) {
-                return fetch(e.request).then(function (response) {
-                    console.log('[Service Worker] retrieved ' + url + ' from server. Caching.');
-                    cache.put(url, response.clone()).then(function () {
-                        cacheAllItems(url);
+            e.respondWith(
+                caches.open(dataCacheName).then(function (cache) {
+                    return fetch(e.request).then(function (response) {
+                        console.log('[Service Worker] retrieved ' + url + ' from server. Caching.');
+                        cache.put(e.request, response.clone()).then(function () {
+                            cacheAllItems(url);
+                        });
+                        return response;
+
+                    }).catch(function () {
+                        console.log('[Service Worker] returning ' + url + ' from cache');
+
+                        // What happens when there's a cache miss, too?
+                        return cache.match(e.request);
                     });
-                    return response;
-
-                }).catch(function () {
-                    console.log('[Service Worker] returning ' + url + ' from cache');
-
-                    // What happens when there's a cache miss, too?
-                    return cache.match(url);
-                });
-            });
+                })
+            );
 
         } else {
 
@@ -204,8 +214,11 @@ self.addEventListener('sync', function(event) {
     }
 });
 
+/**
+ * Listen for messages from the client(s).
+ */
 self.addEventListener('message', function(event) {
-    if (event.data && event.data.name === 'clearOutbox') {
+    if (event.data && event.data.name === 'processOutbox') {
         console.log('[Service Worker] - message received, processing outbox.')
         processOutbox(event);
     }
