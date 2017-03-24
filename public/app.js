@@ -314,6 +314,8 @@
                     // SW is already active, let's get the list
                     app.start();
                 }
+
+                // Use this to listen for completion of install/activation before starting app
                 if (sw) {
                     sw.addEventListener('statechange', function(e) {
                         console.log('[app] service worker is ' + e.target.state);
