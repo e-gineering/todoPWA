@@ -1,18 +1,27 @@
 # Todo PWA
 
+This is an experiment with Progressive Web Applications. It is not, itself, actually a good application!
 
-## Cache Strategy
+## Instructions
 
-Network falling back to cache.
+This is fairly simple to set up and run.
 
-https://jakearchibald.com/2014/offline-cookbook/#network-falling-back-to-cache
+### Prerequisites
 
-### No Connection
+- You need [node](https://nodejs.org/en/), of course.
+- Also [MongoDB](https://www.mongodb.com/).
 
-In the case that the client does not have a connection, the requests fail very quickly before falling back to cache.
+### Set Up Mongo
 
-### Server Unavailable
+- Create a database in Mongo. Call it `todo`.
+- Create a single `todos` collection in the database
 
-When the server is unavailable, either due to flaky network or because the server itself is offline, requests fail 
-after a time. The app will load data from cache, but the experience is far from ideal due to the delay between the
-request being initiated and the cached data being presented.
+### Installing / Running
+
+- Clone / Download the repo.
+- Install dependencies with `npm install`.
+- Set up an environment variable for the database - `MONGODB_URI` = `mongodb://localhost:27017/todo`
+- Run the application with `npm start`.
+- Visit `http://localhost:3000/index.html` in a browser
+
+

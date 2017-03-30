@@ -17,11 +17,11 @@ var filesToCache  = [
 /**
  * Get the "list" response from cache, loop through it and request
  * and cache each item.
- * @param url the URL for the list request (aka the cache key)
+ * @param request the the list request (aka the cache key)
  */
-var cacheAllItems = function cacheAllItems(url) {
+var cacheAllItems = function cacheAllItems(request) {
     caches.open(dataCacheName).then(function(cache) {
-        cache.match(url).then(function (cachedResponse) {
+        cache.match(request).then(function (cachedResponse) {
             cachedResponse.json().then(function (json) {
                 var itemsToCache = [];
                 json.forEach(function (item) {
@@ -174,7 +174,7 @@ self.addEventListener('fetch', function(e) {
                     return fetch(e.request).then(function (response) {
                         console.log('[Service Worker] retrieved ' + url + ' from server. Caching.');
                         cache.put(e.request, response.clone()).then(function () {
-                            cacheAllItems(url);
+                            cacheAllItems(e.request);
                         });
                         return response;
 
