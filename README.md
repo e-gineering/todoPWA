@@ -1,6 +1,7 @@
 # Todo PWA
 
-This is an experiment with Progressive Web Applications. It is not, itself, actually a good application!
+This is an experiment with Progressive Web Applications. It is not, itself, actually a good application! Please see the
+[blog post](https://goo.gl/a7Cz5L) for more details about the code.
 
 ## Instructions
 
